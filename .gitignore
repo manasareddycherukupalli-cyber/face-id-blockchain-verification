@@ -1,0 +1,8 @@
+.env
+out/
+data/calibrate/
+data/scout/
+__pycache__/
+*.pyc
+.venv/
+venv/

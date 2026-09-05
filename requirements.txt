@@ -1,0 +1,21 @@
+# REQUIRES PYTHON 3.11 - not 3.13.
+# facenet-pytorch pins numpy<2, and numpy 1.26 ships no cp313 wheel, so on 3.13
+# pip tries to compile numpy from source and fails without MSVC build tools.
+#   py -3.11 -m venv .venv
+#
+# Verified working set on Windows / Python 3.11.9:
+#   torch 2.2.2+cpu, numpy 1.26.4, facenet-pytorch 2.6.0, web3 8.0.0
+
+# Core pipeline
+facenet-pytorch>=2.6.0      # MTCNN detector + InceptionResnetV1 (VGGFace2) embeddings
+torch>=2.2                  # CPU wheel is fine; pulled automatically on Windows
+Pillow>=10.0
+numpy<2
+requests>=2.31
+python-dotenv>=1.0
+
+# Day 2 (chain) - installed now so nothing blocks later.
+# NOTE: this resolves to web3 8.x. Most tutorials you will find target 6.x and
+# their snippets will not run as written. Day 2 code targets 8.x.
+web3>=8.0
+eth-account>=0.13
