@@ -15,6 +15,7 @@ Targets web3 8.x. Snippets written for 6.x will not run here - notably
 
 import json
 import os
+import time
 from pathlib import Path
 
 from eth_account import Account
@@ -79,7 +80,11 @@ def _send(w3, acct, tx):
     """Sign, send, and wait. Returns the receipt."""
     tx.setdefault("nonce", w3.eth.get_transaction_count(acct.address))
     tx.setdefault("chainId", w3.eth.chain_id)
-    tx.setdefault("gasPrice", w3.eth.gas_price)
+    # web3 8.x builds EIP-1559 transactions, which carry maxFeePerGas. Adding a
+    # legacy gasPrice alongside it produces an unserialisable hybrid, so only
+    # fall back to gasPrice when no 1559 fields are present.
+    if "maxFeePerGas" not in tx and "gasPrice" not in tx:
+        tx["gasPrice"] = w3.eth.gas_price
     if "gas" not in tx:
         tx["gas"] = int(w3.eth.estimate_gas(tx) * 1.25)
     signed = acct.sign_transaction(tx)
@@ -214,7 +219,18 @@ def verify(record_path, contract_address: str = None, log=print) -> bool:
     contract = w3.eth.contract(
         address=Web3.to_checksum_address(address), abi=artifact["abi"]
     )
-    ts, submitter = contract.functions.records(rhash).call()
+    # The public RPC load-balances across nodes, and one lagging a block or two
+    # will report a freshly-written record as absent. Verifying immediately
+    # after anchoring is the normal flow, so retry before believing a miss.
+    ts, submitter = 0, None
+    for attempt in range(6):
+        ts, submitter = contract.functions.records(rhash).call()
+        if ts != 0:
+            break
+        if attempt == 0:
+            log("      not visible yet - waiting for the RPC node to catch up")
+        time.sleep(2)
+
     if ts == 0:
         log("      NOT FOUND on-chain - the local record does not match what was")
         log("      anchored. Either it was altered, or it was never recorded.")
